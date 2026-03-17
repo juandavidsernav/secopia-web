@@ -573,79 +573,27 @@ if prompt := st.chat_input("Pregunta sobre contratacion publica..."):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Pensando..."):
-            client = get_gemini_client()
+        try:
+            with st.spinner("Pensando..."):
+                client = get_gemini_client()
 
-            # Construir historial para Gemini
-            gemini_history = []
-            for msg in st.session_state.messages[:-1]:
-                role = "user" if msg["role"] == "user" else "model"
-                gemini_history.append(types.Content(
-                    role=role,
-                    parts=[types.Part.from_text(text=msg["content"])],
-                ))
+                # Construir historial para Gemini
+                gemini_history = []
+                for msg in st.session_state.messages[:-1]:
+                    role = "user" if msg["role"] == "user" else "model"
+                    gemini_history.append(types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=msg["content"])],
+                    ))
 
-            response = gemini_generate(
-                client,
-                model="gemini-2.5-flash",
-                contents=gemini_history + [
-                    types.Content(
-                        role="user",
-                        parts=[types.Part.from_text(text=prompt)],
-                    )
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    tools=secop_tools,
-                    temperature=0.3,
-                ),
-            )
-
-            # Procesar function calls en loop
-            all_rows = []
-            max_iterations = 5
-            iteration = 0
-
-            while response.candidates and iteration < max_iterations:
-                candidate = response.candidates[0]
-                parts = candidate.content.parts
-
-                # Buscar function calls
-                function_calls = [p for p in parts if p.function_call]
-                if not function_calls:
-                    break
-
-                # Ejecutar cada function call
-                function_responses = []
-                for fc_part in function_calls:
-                    fc = fc_part.function_call
-                    tool_name = fc.name
-                    tool_args = dict(fc.args) if fc.args else {}
-
-                    st.caption(f"Consultando: {tool_name}({json.dumps(tool_args, ensure_ascii=False)})")
-
-                    try:
-                        rows = execute_tool(tool_name, tool_args)
-                        all_rows.extend(rows)
-                        result_text = rows_to_text(rows)
-                    except Exception as e:
-                        result_text = f"Error: {e}"
-
-                    function_responses.append(
-                        types.Part.from_function_response(
-                            name=tool_name,
-                            response={"result": result_text},
-                        )
-                    )
-
-                # Enviar resultados de vuelta a Gemini
                 response = gemini_generate(
                     client,
                     model="gemini-2.5-flash",
                     contents=gemini_history + [
-                        types.Content(role="user", parts=[types.Part.from_text(text=prompt)]),
-                        candidate.content,
-                        types.Content(role="user", parts=function_responses),
+                        types.Content(
+                            role="user",
+                            parts=[types.Part.from_text(text=prompt)],
+                        )
                     ],
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_INSTRUCTION,
@@ -653,55 +601,129 @@ if prompt := st.chat_input("Pregunta sobre contratacion publica..."):
                         temperature=0.3,
                     ),
                 )
-                iteration += 1
 
-            # Extraer respuesta final
-            final_text = ""
-            if response.candidates:
-                for part in response.candidates[0].content.parts:
-                    if part.text:
-                        final_text += part.text
+                # Procesar function calls en loop
+                all_rows = []
+                max_iterations = 5
+                iteration = 0
 
-            if not final_text:
-                final_text = "No pude generar una respuesta. Intenta reformular tu pregunta."
+                while response.candidates and iteration < max_iterations:
+                    candidate = response.candidates[0]
+                    parts = candidate.content.parts
 
-            st.markdown(final_text)
+                    # Buscar function calls
+                    function_calls = [p for p in parts if p.function_call]
+                    if not function_calls:
+                        break
 
-            # Mostrar tabla si hay datos
-            msg_data = {"role": "assistant", "content": final_text}
-            if all_rows:
-                for row in all_rows:
-                    for field in ["urlproceso", "ruta_proceso_en_secop_i"]:
-                        if field in row:
-                            row[field] = extract_url(row[field])
-                df = pd.DataFrame(all_rows)
-                currency_cols = [
-                    "valor_del_contrato", "valor_pagado", "valor_pendiente_de_pago",
-                    "valor_facturado", "cuantia_contrato", "precio_base",
-                    "valor_total_adjudicacion", "valor_total", "valor_total_pagado",
-                ]
-                for col in currency_cols:
-                    if col in df.columns:
-                        df[col] = pd.to_numeric(df[col], errors="coerce")
-                # Formatear columnas monetarias como pesos colombianos
-                col_config = {}
-                for col in currency_cols:
-                    if col in df.columns:
-                        col_config[col] = st.column_config.NumberColumn(
-                            format="$ %,.0f",
+                    # Ejecutar cada function call
+                    function_responses = []
+                    for fc_part in function_calls:
+                        fc = fc_part.function_call
+                        tool_name = fc.name
+                        tool_args = dict(fc.args) if fc.args else {}
+
+                        st.caption(f"Consultando: {tool_name}({json.dumps(tool_args, ensure_ascii=False)})")
+
+                        try:
+                            rows = execute_tool(tool_name, tool_args)
+                            all_rows.extend(rows)
+                            result_text = rows_to_text(rows)
+                        except Exception as e:
+                            result_text = f"Error: {e}"
+
+                        function_responses.append(
+                            types.Part.from_function_response(
+                                name=tool_name,
+                                response={"result": result_text},
+                            )
                         )
-                st.dataframe(df, use_container_width=True, hide_index=True, column_config=col_config)
-                msg_data["dataframe"] = df
 
-                csv = df.to_csv(index=False)
-                st.download_button(
-                    "Descargar CSV",
-                    csv,
-                    file_name="secop_resultados.csv",
-                    mime="text/csv",
+                    # Enviar resultados de vuelta a Gemini
+                    response = gemini_generate(
+                        client,
+                        model="gemini-2.5-flash",
+                        contents=gemini_history + [
+                            types.Content(role="user", parts=[types.Part.from_text(text=prompt)]),
+                            candidate.content,
+                            types.Content(role="user", parts=function_responses),
+                        ],
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_INSTRUCTION,
+                            tools=secop_tools,
+                            temperature=0.3,
+                        ),
+                    )
+                    iteration += 1
+
+                # Extraer respuesta final
+                final_text = ""
+                if response.candidates:
+                    for part in response.candidates[0].content.parts:
+                        if part.text:
+                            final_text += part.text
+
+                if not final_text:
+                    final_text = "No pude generar una respuesta. Intenta reformular tu pregunta."
+
+                st.markdown(final_text)
+
+                # Mostrar tabla si hay datos
+                msg_data = {"role": "assistant", "content": final_text}
+                if all_rows:
+                    for row in all_rows:
+                        for field in ["urlproceso", "ruta_proceso_en_secop_i"]:
+                            if field in row:
+                                row[field] = extract_url(row[field])
+                    df = pd.DataFrame(all_rows)
+                    currency_cols = [
+                        "valor_del_contrato", "valor_pagado", "valor_pendiente_de_pago",
+                        "valor_facturado", "cuantia_contrato", "precio_base",
+                        "valor_total_adjudicacion", "valor_total", "valor_total_pagado",
+                    ]
+                    for col in currency_cols:
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors="coerce")
+                    # Formatear columnas monetarias como pesos colombianos
+                    col_config = {}
+                    for col in currency_cols:
+                        if col in df.columns:
+                            col_config[col] = st.column_config.NumberColumn(
+                                format="$ %,.0f",
+                            )
+                    st.dataframe(df, use_container_width=True, hide_index=True, column_config=col_config)
+                    msg_data["dataframe"] = df
+
+                    csv = df.to_csv(index=False)
+                    st.download_button(
+                        "Descargar CSV",
+                        csv,
+                        file_name="secop_resultados.csv",
+                        mime="text/csv",
+                    )
+
+                st.session_state.messages.append(msg_data)
+
+        except ClientError as e:
+            if "429" in str(e):
+                error_msg = (
+                    "⏳ **SecopIA está recibiendo muchas consultas en este momento.** "
+                    "Por favor espera unos segundos e intenta de nuevo."
                 )
-
-            st.session_state.messages.append(msg_data)
+            else:
+                error_msg = (
+                    "⚠️ **Ocurrió un error al procesar tu consulta.** "
+                    "Intenta de nuevo en unos momentos."
+                )
+            st.warning(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        except Exception:
+            error_msg = (
+                "⚠️ **Ocurrió un error inesperado.** "
+                "Intenta de nuevo o reformula tu pregunta."
+            )
+            st.warning(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
 
 # --- Sidebar ---
 with st.sidebar:

@@ -536,14 +536,22 @@ SYSTEM_INSTRUCTION = (
     "Los datos provienen de datos.gov.co.\n\n"
     "ESTRATEGIA DE BUSQUEDA - MUY IMPORTANTE, SEGUIR ESTE ORDEN:\n"
     "1. Si tienes NIT o cedula: usa buscar_por_persona PRIMERO.\n"
-    "2. PRIMERA BUSQUEDA: Usa SIEMPRE busqueda_texto con las palabras clave mas importantes de la pregunta. "
-    "busqueda_texto busca en TODOS los campos simultaneamente y es la forma mas efectiva de encontrar resultados. "
-    "Ejemplo: si preguntan por 'contratos de RTVC sobre almirante padilla', "
-    "usa busqueda_texto='RTVC padilla' en buscar_contratos_secop2.\n"
-    "3. SEGUNDA BUSQUEDA (solo si la primera no da resultados): Usa filtros estructurados "
-    "(entidad=, objeto=) con nombres cortos o siglas.\n"
-    "4. SECOP II es la plataforma vigente. Busca SIEMPRE primero en SECOP II.\n"
-    "5. Solo busca en SECOP I si no hay resultados en SECOP II o el contrato es anterior a 2020.\n\n"
+    "2. Usa SIEMPRE busqueda_texto como metodo principal. "
+    "busqueda_texto busca en TODOS los campos simultaneamente y es la forma mas efectiva.\n"
+    "3. Genera MULTIPLES variaciones de busqueda_texto con diferentes combinaciones de palabras clave. "
+    "Piensa en como podria estar registrado el contrato en SECOP. Ejemplos:\n"
+    "   - Si preguntan por 'pelicula del almirante padilla de RTVC':\n"
+    "     * busqueda_texto='almirante padilla'\n"
+    "     * busqueda_texto='padilla pelicula'\n"
+    "     * busqueda_texto='RTVC padilla'\n"
+    "   - Si preguntan por 'consultoria de seguridad en el Ministerio de Defensa':\n"
+    "     * busqueda_texto='seguridad consultoria defensa'\n"
+    "     * busqueda_texto='consultoria seguridad ministerio'\n"
+    "4. Usa tu conocimiento general para inferir palabras clave relevantes. "
+    "Si el usuario menciona una pelicula, serie, proyecto u obra, piensa en terminos "
+    "que aparecerian en un contrato: produccion, realizacion, audiovisual, prestacion de servicios, etc.\n"
+    "5. SECOP II es la plataforma vigente. Busca SIEMPRE primero en SECOP II.\n"
+    "6. Solo busca en SECOP I si no hay resultados en SECOP II o el contrato es anterior a 2020.\n\n"
     "NOMBRES COMUNES vs SECOP:\n"
     "- 'RTVC' aparece como 'RADIO TELEVISION NACIONAL DE COLOMBIA' o 'RTVC SISTEMA DE MEDIOS PUBLICOS'\n"
     "- 'ICETEX' puede aparecer como 'INSTITUTO COLOMBIANO DE CREDITO EDUCATIVO...'\n"
@@ -555,7 +563,7 @@ SYSTEM_INSTRUCTION = (
     "- Si los resultados incluyen valores monetarios, presentalos formateados.\n"
     "- SIEMPRE indica el numero total de filas/registros encontrados al inicio de tu respuesta. "
     "Ejemplo: 'Se encontraron 15 registros en total.'\n"
-    "- Haz MAXIMO 3 llamadas a herramientas por consulta. No hagas mas de 3 intentos."
+    "- Haz MAXIMO 4 llamadas a herramientas por consulta. No hagas mas de 4 intentos."
 )
 
 if "messages" not in st.session_state:
@@ -615,7 +623,7 @@ if prompt := st.chat_input("Pregunta sobre contratacion publica..."):
 
                 # Procesar function calls en loop
                 all_rows = []
-                max_iterations = 3
+                max_iterations = 4
                 iteration = 0
 
                 while response.candidates and iteration < max_iterations:

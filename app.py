@@ -541,10 +541,26 @@ SYSTEM_INSTRUCTION = (
     "4. Solo busca en SECOP I si no hay resultados en SECOP II o el contrato es anterior a 2020.\n"
     "5. Si una busqueda no da resultados, intenta con busqueda_texto.\n"
     "6. Los nombres de entidades pueden diferir del nombre coloquial.\n\n"
-    "Responde siempre en espanol. Incluye las URLs de los procesos cuando esten disponibles. "
-    "Si los resultados incluyen valores monetarios, presentalos formateados. "
-    "SIEMPRE indica el numero total de filas/registros encontrados al inicio de tu respuesta. "
-    "Ejemplo: 'Se encontraron 15 registros en total.'"
+    "ESTRATEGIA CUANDO NO HAY RESULTADOS - MUY IMPORTANTE:\n"
+    "Cuando una busqueda no devuelve resultados, NO repitas la misma busqueda. En su lugar:\n"
+    "a) Intenta con nombres CORTOS o PARCIALES de la entidad. Ejemplo: en vez de "
+    "'Radio Television Nacional de Colombia' prueba solo 'RTVC' o 'Radio Television' o 'Television Nacional'.\n"
+    "b) Intenta buscar SOLO por el objeto sin filtrar por entidad.\n"
+    "c) Usa busqueda_texto con palabras clave sueltas (ej: 'padilla pelicula RTVC').\n"
+    "d) Prueba con siglas o abreviaturas conocidas de la entidad.\n"
+    "e) Si nada funciona, dile al usuario que nombre alternativo podria tener la entidad y pidele el NIT.\n\n"
+    "NOMBRES COMUNES vs SECOP:\n"
+    "- 'RTVC' aparece como 'RADIO TELEVISION NACIONAL DE COLOMBIA' o 'RTVC SISTEMA DE MEDIOS PUBLICOS'\n"
+    "- 'ICETEX' puede aparecer como 'INSTITUTO COLOMBIANO DE CREDITO EDUCATIVO...'\n"
+    "- 'Ministerio de Educacion' puede ser 'MINISTERIO DE EDUCACION NACIONAL'\n"
+    "- Siempre prueba primero con el nombre corto/sigla y luego con el nombre completo.\n\n"
+    "FORMATO DE RESPUESTA:\n"
+    "- Responde siempre en espanol.\n"
+    "- Incluye las URLs de los procesos cuando esten disponibles.\n"
+    "- Si los resultados incluyen valores monetarios, presentalos formateados.\n"
+    "- SIEMPRE indica el numero total de filas/registros encontrados al inicio de tu respuesta. "
+    "Ejemplo: 'Se encontraron 15 registros en total.'\n"
+    "- Haz MAXIMO 3 llamadas a herramientas por consulta. No hagas mas de 3 intentos."
 )
 
 if "messages" not in st.session_state:
@@ -604,7 +620,7 @@ if prompt := st.chat_input("Pregunta sobre contratacion publica..."):
 
                 # Procesar function calls en loop
                 all_rows = []
-                max_iterations = 5
+                max_iterations = 3
                 iteration = 0
 
                 while response.candidates and iteration < max_iterations:

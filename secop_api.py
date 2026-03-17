@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import unicodedata
 from typing import Any
 
 import httpx
@@ -97,6 +98,12 @@ async def query_dataset(
     return resp.json()
 
 
+def _strip_accents(text: str) -> str:
+    """Remueve tildes y diacríticos. SECOP frecuentemente no los tiene."""
+    nfkd = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
 def build_where(filters: dict[str, str | float | None]) -> str | None:
     clauses: list[str] = []
     for field, value in filters.items():
@@ -105,7 +112,7 @@ def build_where(filters: dict[str, str | float | None]) -> str | None:
         if isinstance(value, (int, float)):
             clauses.append(f"{field} >= {value}")
         else:
-            safe = value.replace("'", "''")
+            safe = _strip_accents(value).replace("'", "''")
             clauses.append(f"upper({field}) like upper('%{safe}%')")
     return " AND ".join(clauses) if clauses else None
 
